@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ChecklistDiff{% endblock %}</title>
+  <style>
+    :root {
+      --bg: #fbfbfa; --fg: #1b1b1a; --muted: #6b6b66; --line: #e2e1dd;
+      --card: #fff; --accent: #2d6a4f; --warn: #9a6700; --danger: #a3322a;
+      --advisory: #6b4ea3;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #16171a; --fg: #e6e6e3; --muted: #9a9a94; --line: #2c2e33;
+        --card: #1d1f23; --accent: #74c69d; --warn: #d9a441; --danger: #e5766b;
+        --advisory: #b19cd9;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--fg);
+      font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .wrap { max-width: 60rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    header { border-bottom: 1px solid var(--line); margin-bottom: 1.75rem; }
+    header .wrap { padding-bottom: 1.25rem; }
+    h1 { font-size: 1.15rem; margin: 0; letter-spacing: -0.01em; }
+    h1 a { color: inherit; text-decoration: none; }
+    h1 .sub { color: var(--muted); font-weight: 400; }
+    form { display: flex; gap: .5rem; margin-top: 1rem; }
+    input[type=search] {
+      flex: 1; padding: .6rem .75rem; font-size: 1rem; font-family: inherit;
+      border: 1px solid var(--line); border-radius: 6px;
+      background: var(--card); color: var(--fg);
+    }
+    input[type=search]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+    button {
+      padding: .6rem 1.1rem; font-size: 1rem; font-family: inherit; cursor: pointer;
+      border: 1px solid var(--accent); border-radius: 6px;
+      background: var(--accent); color: var(--bg);
+    }
+    .note { color: var(--muted); font-size: .9rem; }
+    .banner {
+      padding: .6rem .85rem; border-radius: 6px; margin-bottom: 1.25rem;
+      border: 1px solid var(--line); background: var(--card); font-size: .9rem;
+    }
+    .banner.warn { border-color: var(--warn); color: var(--warn); }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
+    table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+    th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 500; font-size: .85rem; }
+    .scroll { overflow-x: auto; }
+    footer { margin-top: 3rem; color: var(--muted); font-size: .85rem; }
+    a { color: var(--accent); }
+    {% block style %}{% endblock %}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1><a href="/">ChecklistDiff</a> <span class="sub">— taxonomic name trace</span></h1>
+      <form action="/" method="get" role="search">
+        <input type="search" name="q" value="{{ query or '' }}"
+               placeholder="Scientific name, e.g. Zanthoxylum ailanthoides"
+               autocomplete="off" autofocus>
+        <button type="submit">Trace</button>
+      </form>
+    </div>
+  </header>
+  <div class="wrap">
+    {% block content %}{% endblock %}
+    <footer>
+      JSON: <code>/api/trace?name=…</code> &middot;
+      <code>/api/checklists</code>
+    </footer>
+  </div>
+</body>
+</html>

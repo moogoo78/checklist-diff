@@ -1,0 +1,43 @@
+[project]
+name = "checklistdiff"
+version = "0.1.0"
+description = "Track taxonomic checklists across releases and trace what happened to a scientific name"
+requires-python = ">=3.12"
+dependencies = [
+    "SQLAlchemy>=2.0.36",
+    "alembic>=1.14",
+    "typer>=0.15",
+    "PyYAML>=6.0",
+    "rapidfuzz>=3.10",
+    "openpyxl>=3.1",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    # Required by starlette.testclient; not pulled in by fastapi itself.
+    "httpx2",
+]
+
+[project.scripts]
+ckdiff = "checklistdiff.cli:app"
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["checklistdiff*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+# /app is owned by root in the image and tests run as an unprivileged user.
+cache_dir = "/tmp/.pytest_cache"
+markers = [
+    "needs_gnparser: requires the gnparser binary on PATH",
+]

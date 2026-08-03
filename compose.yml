@@ -1,0 +1,35 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile
+      args:
+        PYTHON_VERSION: "3.12"
+        GNPARSER_VERSION: "1.15.0"
+    image: checklistdiff/app
+    container_name: checklistdiff-app
+    environment:
+      - CKDIFF_DB_PATH=/data/checklistdiff.sqlite
+      - CKDIFF_GNPARSER_BIN=/usr/local/bin/gnparser
+      - CKDIFF_LOG_LEVEL=${CKDIFF_LOG_LEVEL:-INFO}
+    # The container user is uid 1000 to match a typical host user, so the
+    # bind-mounted ./data is writable from inside without chown gymnastics.
+    # Override if your host uid differs: CKDIFF_UID=$(id -u) docker compose up -d
+    user: "${CKDIFF_UID:-1000}:${CKDIFF_GID:-1000}"
+    volumes:
+      # The database is a bind mount rather than a named volume so you can open
+      # it with any SQLite tool on the host, copy it, and back it up. It is
+      # gitignored. ./checklists is where you drop source archives/spreadsheets.
+      - ./data:/data
+      - ./checklists:/checklists:ro
+      # Source is bind-mounted for development so edits apply without a rebuild.
+      # Note this shadows the copies baked into the image at build time.
+      - ./checklistdiff:/app/checklistdiff
+      - ./alembic:/app/alembic
+      - ./tests:/app/tests
+      - ./pyproject.toml:/app/pyproject.toml:ro
+      - ./alembic.ini:/app/alembic.ini:ro
+    ports:
+      # Override with CKDIFF_PORT if 8087 clashes with something else you run.
+      - "${CKDIFF_PORT:-8087}:8000"
+    restart: unless-stopped

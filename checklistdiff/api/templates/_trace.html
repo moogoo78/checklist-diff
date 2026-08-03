@@ -1,0 +1,68 @@
+{# One name's timeline. Expects `t` (a trace dict) in scope. #}
+<section class="trace">
+  <h2>
+    <em>{{ t.canonical_name }}</em>
+    {% if t.authorship %}<span class="auth">{{ t.authorship }}</span>{% endif %}
+    {% if scores.get(t.name_id) %}
+      <span class="badge fuzzy">fuzzy {{ scores[t.name_id] }}</span>
+    {% endif %}
+  </h2>
+  <p class="note">
+    {{ t.rank or 'rank unknown' }} &middot;
+    in {{ t.checklist_count }} checklist{{ '' if t.checklist_count == 1 else 's' }}
+  </p>
+
+  {% if not t.checklists %}
+    <p class="note">Recorded as a name, but no release currently uses it.</p>
+  {% endif %}
+
+  {% for c in t.checklists %}
+    <div class="cl">
+      <div class="cl-head">
+        <code>{{ c.code }}</code> {{ c.title }}
+        <span class="note">
+          &middot; {{ c.anchor_kind or '—' }} anchoring
+          &middot; {{ c.first_seen }}{% if c.last_seen != c.first_seen %} → {{ c.last_seen }}{% endif %}
+        </span>
+      </div>
+
+      <ol class="timeline">
+        {% for a in c.appearances %}
+        <li>
+          <div class="rel">
+            <strong>{{ a.release }}</strong>
+            <span class="note">{{ a.released_on or '' }}</span>
+            <span class="badge s-{{ a.status }}">{{ a.status }}</span>
+            {% if a.accepted_name %}
+              <span class="note">of</span> <em>{{ a.accepted_name }}</em>
+            {% endif %}
+            {% if a.rank %}<span class="note">&middot; {{ a.rank }}</span>{% endif %}
+          </div>
+
+          {% if a.changes %}
+          <ul class="changes">
+            {% for ch in a.changes %}
+            <li class="{{ 'advisory' if ch.advisory else '' }}">
+              <span class="ctype">{{ ch.type }}</span>
+              {% if ch.confidence %}<span class="badge fuzzy">{{ ch.confidence }}</span>{% endif %}
+              <span class="note">{{ ch.detail | describe_change(ch.type) }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ol>
+    </div>
+  {% endfor %}
+
+  {% if t.related %}
+    <p class="note related">
+      Also published as:
+      {% for r in t.related %}
+        <em>{{ r.scientific_name }}</em>{% if not loop.last %}, {% endif %}
+      {% endfor %}
+      <br>(same canonical name, different authorship — possibly a homonym)
+    </p>
+  {% endif %}
+</section>

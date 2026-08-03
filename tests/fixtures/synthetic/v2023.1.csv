@@ -1,0 +1,17 @@
+taxonID,scientificName,author,rank,status,acceptedNameUsageID,parentNameUsageID,family,genus,vernacularName
+T001,Testia alpha,Smith,species,accepted,,,Testiaceae,Testia,alpha test-plant
+T002,Testia beta,Smith,species,accepted,,,Testiaceae,Testia,beta test-plant
+T003,Testia gamma,Smith,species,accepted,,,Testiaceae,Testia,gamma test-plant
+T004,Testia delta,Smith,species,accepted,,,Testiaceae,Testia,delta test-plant
+T005,Testia epsilon,Smith,species,accepted,,,Testiaceae,Testia,epsilon test-plant
+T006,Testia zeta,Smith,species,synonym,T005,,Testiaceae,Testia,
+T007,Testia eta,Smith,species,accepted,,,Testiaceae,Testia,eta test-plant
+T008,Testia theta,Smith,species,accepted,,G001,Testiaceae,Testia,theta test-plant
+T009,Testia iota,Smith,species,accepted,,,Testiaceae,Testia,iota test-plant
+T010,Testia kappa,Smith,species,accepted,,,Testiaceae,Testia,kappa test-plant
+T012,Testia mu,Smith,species,accepted,,,Testiaceae,Testia,mu test-plant
+T013,Testia nu,Smith,species,accepted,,,Testiaceae,Testia,nu test-plant
+T014,Testia xi,Smith,species,accepted,,,Testiaceae,Testia,xi test-plant
+T015,Testia omicron,Smith,species,synonym,T014,,Testiaceae,Testia,
+T016,Testia pi,Smith,species,synonym,T014,,Testiaceae,Testia,
+G001,Testia,Smith,genus,accepted,,,Testiaceae,Testia,

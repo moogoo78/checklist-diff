@@ -1,0 +1,26 @@
+.git
+.gitignore
+.venv
+venv
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.coverage
+htmlcov
+
+# Never bake data or credentials into an image.
+data/
+checklists/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.env
+*.pem
+*.key
+
+# Docs and editor cruft.
+*.md
+!README.md
+.vscode
+.idea

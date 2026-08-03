@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Both directories are compose bind mounts and must exist in a fresh clone:
+# Docker creates a missing bind source as root, which locks the uid-1000
+# container out of its own data directory. So track the dirs, ignore contents.
+data/*
+!data/.gitkeep
+checklists/*
+!checklists/.gitkeep
+
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.env

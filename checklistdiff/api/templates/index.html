@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block style %}
+    .trace { margin-bottom: 2.5rem; }
+    .trace h2 { font-size: 1.25rem; margin: 0 0 .15rem; font-weight: 600; }
+    .trace h2 .auth { font-weight: 400; color: var(--muted); font-size: .95rem; }
+    .cl { margin-top: 1.25rem; border: 1px solid var(--line); border-radius: 8px;
+          background: var(--card); overflow: hidden; }
+    .cl-head { padding: .55rem .85rem; border-bottom: 1px solid var(--line); font-size: .93rem; }
+    .timeline { list-style: none; margin: 0; padding: .35rem 0; }
+    .timeline > li { padding: .4rem .85rem .4rem 1.6rem; position: relative; }
+    /* A rail with a node per release, so the sequence reads as a sequence. */
+    .timeline > li::before {
+      content: ""; position: absolute; left: .85rem; top: .95rem;
+      width: 7px; height: 7px; border-radius: 50%; background: var(--muted);
+    }
+    .timeline > li::after {
+      content: ""; position: absolute; left: 1.15rem; top: 1.5rem; bottom: -.4rem;
+      width: 1px; background: var(--line);
+    }
+    .timeline > li:last-child::after { display: none; }
+    .rel { display: flex; flex-wrap: wrap; gap: .4rem; align-items: baseline; }
+    .badge {
+      font-size: .72rem; padding: .1rem .45rem; border-radius: 999px;
+      border: 1px solid var(--line); text-transform: uppercase; letter-spacing: .03em;
+    }
+    .s-accepted { color: var(--accent); border-color: var(--accent); }
+    .s-synonym, .s-ambiguous_synonym { color: var(--warn); border-color: var(--warn); }
+    .s-misapplied { color: var(--danger); border-color: var(--danger); }
+    .fuzzy { color: var(--advisory); border-color: var(--advisory); text-transform: none; }
+    .changes { list-style: none; margin: .3rem 0 0; padding: 0; font-size: .88rem; }
+    .changes li { padding: .1rem 0; }
+    .changes .ctype {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .82rem; color: var(--fg);
+    }
+    /* Inferred changes must never look like asserted ones. */
+    .changes li.advisory .ctype { color: var(--advisory); font-style: italic; }
+    .changes li.advisory::before { content: "~ "; color: var(--advisory); }
+    .changes li:not(.advisory)::before { content: "• "; color: var(--muted); }
+    .related { margin-top: 1rem; }
+{% endblock %}
+
+{% block content %}
+
+{% if not query %}
+  <p class="note">
+    Type a scientific name to see every checklist and release that mentions it,
+    and what changed between them.
+  </p>
+
+  <h2 style="font-size:1rem;margin-top:2rem">Checklists</h2>
+  {% if checklists %}
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Code</th><th>Title</th><th>Anchoring</th><th>Releases</th></tr>
+      </thead>
+      <tbody>
+        {% for c in checklists %}
+        <tr>
+          <td><code>{{ c.code }}</code></td>
+          <td>{{ c.title }}</td>
+          <td>{{ c.id_stability }}</td>
+          <td>
+            {% for r in c.releases %}
+              {{ r.version }}<span class="note"> ({{ r.usage_count }})</span>{% if not loop.last %}, {% endif %}
+            {% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p class="note">
+      Nothing ingested yet. Register a checklist and load a release:
+      <br><code>ckdiff checklist add --code mylist --title "…"</code>
+      <br><code>ckdiff ingest --checklist mylist --version 2024.1 --file … --map …</code>
+    </p>
+  {% endif %}
+
+{% elif not traces %}
+  <div class="banner warn">No match for <strong>{{ query }}</strong>.</div>
+  <p class="note">
+    Names are matched exactly first, then by canonical name ignoring authorship,
+    then fuzzily. Nothing cleared the fuzzy threshold.
+  </p>
+
+{% else %}
+  {% if tier == 'fuzzy' %}
+    <div class="banner warn">
+      No exact match. Showing {{ traces|length }} fuzzy result{{ '' if traces|length == 1 else 's' }} —
+      these are similar names, not confirmed identities.
+    </div>
+  {% elif traces|length > 1 %}
+    <div class="banner warn">
+      {{ traces|length }} names share this canonical name. They may be homonyms
+      (genuinely different taxa) or the same name under different authorships.
+    </div>
+  {% endif %}
+
+  {% for t in traces %}
+    {% include "_trace.html" %}
+  {% endfor %}
+{% endif %}
+
+{% endblock %}

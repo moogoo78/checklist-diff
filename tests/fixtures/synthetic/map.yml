@@ -1,0 +1,18 @@
+# Field map for the synthetic fixture CSVs.
+# Doubles as the worked example of the csvmap format.
+fields:
+  source_taxon_id: taxonID
+  scientific_name: scientificName
+  authorship: author
+  rank: rank
+  status: status
+  accepted_taxon_id: acceptedNameUsageID
+  parent_taxon_id: parentNameUsageID
+
+classification:
+  family: family
+  genus: genus
+
+vernacular:
+  - column: vernacularName
+    language: en
