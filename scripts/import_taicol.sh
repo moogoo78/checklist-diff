@@ -73,13 +73,23 @@ for path in $(printf '%s\n' "${files[@]}" | sort); do
 
     echo
     echo "=== ingesting $base as $CODE/$version ==="
-    "${EXEC[@]}" ckdiff ingest \
-        --checklist "$CODE" \
-        --version "$version" \
-        --file "/checklists/$base" \
-        --reader taicol-name \
-        --released-on "${y}-${m}-${d}" \
-        $REPLACE
+    # Already-ingested releases are skipped rather than treated as an error, so
+    # adding one older export to a loaded database does not mean reloading the
+    # others. `--replace` is the way to ask for that deliberately.
+    if out=$("${EXEC[@]}" ckdiff ingest \
+            --checklist "$CODE" \
+            --version "$version" \
+            --file "/checklists/$base" \
+            --reader taicol-name \
+            --released-on "${y}-${m}-${d}" \
+            $REPLACE 2>&1); then
+        echo "$out"
+    elif grep -q "already ingested" <<<"$out"; then
+        echo "already loaded, skipping (use --replace to reload)"
+    else
+        echo "$out" >&2
+        exit 1
+    fi
 done
 
 if [[ ${#versions[@]} -lt 2 ]]; then
@@ -88,19 +98,26 @@ if [[ ${#versions[@]} -lt 2 ]]; then
     exit 0
 fi
 
-from=${versions[0]}
-to=${versions[${#versions[@]} - 1]}
+# Diff *consecutive* pairs, not oldest against newest: a change set is defined
+# between successive releases, and a taxon that was sunk and then restored would
+# vanish entirely from an endpoints-only comparison.
+for (( i = 0; i < ${#versions[@]} - 1; i++ )); do
+    from=${versions[i]}
+    to=${versions[i + 1]}
 
-echo
-echo "=== ID stability: $from -> $to ==="
-# Run before the diff: it reports whether TaiCOL's name_ids actually survive
-# between releases, which is what decides the anchoring strategy.
-"${EXEC[@]}" ckdiff checklist check-ids --code "$CODE" --from "$from" --to "$to"
+    echo
+    echo "=== ID stability: $from -> $to ==="
+    # Run before the diff: it reports whether TaiCOL's name_ids actually survive
+    # between releases, which is what decides the anchoring strategy.
+    "${EXEC[@]}" ckdiff checklist check-ids --code "$CODE" --from "$from" --to "$to"
 
-echo
-echo "=== diff: $from -> $to ==="
-"${EXEC[@]}" ckdiff diff run --checklist "$CODE" --from "$from" --to "$to" ${REPLACE:+--force}
+    echo
+    echo "=== diff: $from -> $to ==="
+    "${EXEC[@]}" ckdiff diff run --checklist "$CODE" \
+        --from "$from" --to "$to" ${REPLACE:+--force}
+done
 
 echo
 echo "done. Browse at http://localhost:${CKDIFF_PORT:-8087}, or:"
-echo "  docker compose exec app ckdiff diff show --checklist $CODE --from $from --to $to"
+echo "  docker compose exec app ckdiff diff show --checklist $CODE \\"
+echo "      --from ${versions[0]} --to ${versions[1]}"

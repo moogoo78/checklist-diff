@@ -112,10 +112,12 @@ def _open_csv(path: Path) -> Iterator[TextIO]:
             yield fh
 
 
-def _index(path: Path) -> tuple[dict[str, str], dict[tuple[str, str, str], str]]:
-    """First pass: build the two lookups that let every link be made by ID.
+def _index(
+    path: Path,
+) -> tuple[dict[str, str], dict[tuple[str, str, str], str], dict[str, str]]:
+    """First pass: build the lookups that let every link be made by ID.
 
-    Returns `(accepted_by_taxon, parent_by_rank)`:
+    Returns `(accepted_by_taxon, parent_by_rank, primary_taxon)`:
 
     * `taxon_id -> name_id of the accepted name`, because the file links a
       synonym to its accepted name only through a shared taxon. Resolving by
@@ -125,13 +127,21 @@ def _index(path: Path) -> tuple[dict[str, str], dict[tuple[str, str, str], str]]
     * `(rank, name, kingdom) -> name_id`, so a parent drawn from the
       denormalised classification columns can be given as an ID.
 
+    * `name_id -> taxon_id of its accepted usage`, which decides *which* of a
+      name's usages gets the bare name_id as its anchor. Picking that by
+      position instead would tie the anchor to the order of the comma-joined
+      lists, and TaiCOL does not keep that order stable: four names across the
+      2024 and 2026 releases move their accepted usage from second to first,
+      which would silently show up in the diff as a removal plus an addition.
+
     Both matter for speed as much as correctness: the loader resolves a link by
     ID with a dict lookup, but resolves one given as a *name* by calling the
     parser, and `NameParser.parse` spawns one gnparser process per name. Handing
     it ~96k parent names to parse individually takes hours.
     """
     accepted: dict[str, str] = {}
-    first_status: dict[str, str] = {}
+    primary: dict[str, str] = {}
+    has_accepted: set[str] = set()
     candidates: list[tuple[tuple[str, str, str], str]] = []
 
     with _open_csv(path) as fh:
@@ -147,26 +157,33 @@ def _index(path: Path) -> tuple[dict[str, str], dict[tuple[str, str, str], str]]
                 if status == "accepted":
                     accepted.setdefault(taxon_id, name_id)
 
-            if statuses:
-                first_status.setdefault(name_id, statuses[0])
+            if statuses and len(statuses) == len(taxa):
+                own = next(
+                    (t for st, t in zip(statuses, taxa) if st == "accepted"), None
+                )
+                if own is not None:
+                    has_accepted.add(name_id)
+                primary.setdefault(name_id, own or taxa[0])
 
             rank = (_clean(row.get("rank")) or "").lower()
             if rank in CLASS_COLS:
                 kingdom = _clean(row.get("kingdom")) or ""
                 candidates.append(((rank, simple_name, kingdom), name_id))
 
-    # A parent is addressed by the name's *bare* name_id, which `_anchor` gives
-    # to a name's first usage — so only names whose first usage is the accepted
-    # one can be pointed at this way.
+    # A parent is addressed by the name's *bare* name_id, and `_anchor` gives
+    # that to the accepted usage — so only names that have one can be pointed
+    # at this way.
     parents: dict[tuple[str, str, str], str] = {}
     for key, name_id in candidates:
-        if first_status.get(name_id) == "accepted":
+        if name_id in has_accepted:
             parents.setdefault(key, name_id)
 
-    return accepted, parents
+    return accepted, parents, primary
 
 
-def _anchor(name_id: str, taxon_id: str | None, seen: set[str]) -> str:
+def _anchor(
+    name_id: str, taxon_id: str | None, primary: dict[str, str], seen: set[str]
+) -> str:
     """Return a key for this usage, unique within the release.
 
     `usage.source_taxon_id` is unique per (release, id), but a TaiCOL name_id is
@@ -175,11 +192,15 @@ def _anchor(name_id: str, taxon_id: str | None, seen: set[str]) -> str:
     sometimes — `Homalium fagifolium` appears twice in the 2025 release under one
     name_id *and* one taxon_id, once `not-accepted` and once `misapplied`.
 
-    The first usage of a name keeps the bare name_id, so the anchor a release
-    diff cares about stays stable; later usages are qualified by taxon, and only
-    if that still repeats by a counter.
+    The name's *accepted* usage keeps the bare name_id — chosen by content, not
+    by position, so a release that reorders the lists does not move the anchor.
+    Other usages are qualified by taxon, and only if that still repeats by a
+    counter.
     """
-    candidate = name_id if name_id not in seen else f"{name_id}#{taxon_id or 'x'}"
+    qualified = f"{name_id}#{taxon_id or 'x'}"
+    candidate = name_id if primary.get(name_id, taxon_id) == taxon_id else qualified
+    if candidate in seen:
+        candidate = qualified
     if candidate in seen:
         suffix = 2
         while f"{candidate}#{suffix}" in seen:
@@ -214,7 +235,7 @@ def _parent_id(
 
 def read_rows(path: Path) -> Iterator[SourceRow]:
     """Yield `SourceRow`s from a TaiCOL name export (.csv or zipped .csv)."""
-    accepted_by_taxon, parents = _index(path)
+    accepted_by_taxon, parents, primary = _index(path)
     log.info(
         "taicol: %d taxa with an accepted name, %d addressable parents",
         len(accepted_by_taxon),
@@ -252,7 +273,9 @@ def read_rows(path: Path) -> Iterator[SourceRow]:
             # so the release stays a faithful copy of the file.
             if not statuses:
                 yield SourceRow(
-                    source_taxon_id=_anchor(name_id, None, seen) if name_id else None,
+                    source_taxon_id=(
+                        _anchor(name_id, None, primary, seen) if name_id else None
+                    ),
                     scientific_name=simple_name,
                     authorship=_clean(row.get("name_author")),
                     rank=rank,
@@ -283,7 +306,9 @@ def read_rows(path: Path) -> Iterator[SourceRow]:
 
                 yield SourceRow(
                     source_taxon_id=(
-                        _anchor(name_id, taxon_id, seen) if name_id else None
+                        _anchor(name_id, taxon_id, primary, seen)
+                        if name_id
+                        else None
                     ),
                     scientific_name=simple_name,
                     authorship=_clean(row.get("name_author")),

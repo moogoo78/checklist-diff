@@ -116,6 +116,31 @@ class TestTaicolReader:
         assert extra.status.value == "misapplied"
         assert extra.accepted_taxon_id == "2"
 
+    def test_accepted_usage_anchors_regardless_of_list_order(
+        self, tmp_path: Path
+    ) -> None:
+        """The bare name_id must follow the accepted usage, not position 0.
+
+        TaiCOL does not keep the order of the comma-joined lists stable between
+        releases. If the anchor tracked position, a name whose accepted usage
+        moved from second to first would leave one anchor and arrive at
+        another — reported as a removal plus an addition that never happened.
+        """
+        reordered = [
+            r for r in ROWS if r["name_id"] != "4"
+        ] + [
+            {"name_id": "4", "simple_name": "Testia beta", "name_author": "Brown",
+             "rank": "Species", "usage_status": "misapplied,accepted",
+             "taxon_id": "t002,t004", **PLANT},
+        ]
+        rows = {
+            r.source_taxon_id: r
+            for r in taicol.read_rows(_write_csv(tmp_path, reordered))
+        }
+        # Same anchors as the accepted-first ordering in ROWS.
+        assert rows["4"].status.value == "accepted"
+        assert rows["4#t002"].status.value == "misapplied"
+
     def test_unplaced_name_is_kept_as_unknown(self, tmp_path: Path) -> None:
         """Dropping these would make the next release report them as removed."""
         row = _by_anchor(_write_csv(tmp_path))["5"]

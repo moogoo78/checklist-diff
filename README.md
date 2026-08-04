@@ -67,8 +67,11 @@ Drop the exports in `./checklists/` as `TaiCOL_name_YYYYMMDD.zip` and run:
 ```
 
 It registers the checklist, ingests every export it finds — reading the version
-and release date from each filename — then runs `check-ids` and diffs the oldest
-against the newest. Re-run with `--replace` to reload releases already ingested.
+and release date from each filename — then runs `check-ids` and diffs each
+consecutive pair. Releases already loaded are skipped, so dropping in one more
+export and re-running only ingests that one. `--replace` reloads everything
+instead, which is what a change to how the reader assigns anchors calls for:
+releases must not be mixed across two anchoring rules.
 
 Prefer the *name* export over the *taxon* export: the latter packs synonyms into
 a comma-joined column with their authorship stripped, which both loses author
