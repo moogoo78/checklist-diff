@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from checklistdiff.db import chunked
 from checklistdiff.models import (
     AnchorKind,
     Checklist,
@@ -210,13 +211,16 @@ def persist_tracks(
     anchor = result.anchor_kind
     keys = set(result.before) | set(result.after)
 
+    # Chunked: a real checklist has more anchors than SQLite allows bind
+    # parameters in one statement.
     existing = {
         t.anchor_key: t
+        for chunk in chunked(keys)
         for t in session.scalars(
             select(Track).where(
                 Track.checklist_id == checklist.id,
                 Track.anchor_kind == anchor.value,
-                Track.anchor_key.in_(list(keys)),
+                Track.anchor_key.in_(chunk),
             )
         ).all()
     }

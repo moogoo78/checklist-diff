@@ -350,3 +350,47 @@ class TestAnchoringModesDisagree:
         # it should fire only where the certain mechanism is unavailable.
         assert unstable[ChangeType.PROBABLE_RENAME.value] == 1
         assert persistent[ChangeType.PROBABLE_RENAME.value] == 0
+
+
+class TestBindParameterLimits:
+    """SQLite caps bind parameters per statement, and the cap is high.
+
+    Every checklist below the cap works and the first one above it fails with
+    "too many SQL variables" — at diff time, on real data, long after the small
+    fixtures have all passed. These tests pin the chunking that prevents it.
+    """
+
+    def test_chunked_splits_and_preserves_everything(self) -> None:
+        from checklistdiff.db import chunked
+
+        items = list(range(12_345))
+        batches = list(chunked(items, size=1000))
+
+        assert max(len(b) for b in batches) == 1000
+        assert [x for b in batches for x in b] == items
+
+    def test_chunked_handles_empty_and_exact_multiples(self) -> None:
+        from checklistdiff.db import chunked
+
+        assert list(chunked([], size=10)) == []
+        assert list(chunked(range(20), size=10)) == [list(range(10)), list(range(10, 20))]
+
+    def test_track_lookup_is_chunked(self) -> None:
+        """`persist_tracks` must never build one IN clause over every anchor."""
+        import inspect
+
+        from checklistdiff.diff import match
+
+        source = inspect.getsource(match.persist_tracks)
+        assert "chunked(" in source, "track lookup must chunk its IN clause"
+        assert ".in_(list(" not in source, "unbounded IN clause reintroduced"
+
+    def test_name_lookup_is_chunked(self) -> None:
+        """Same hazard in the ingest path: one IN over every name in a release."""
+        import inspect
+
+        from checklistdiff.ingest import loader
+
+        source = inspect.getsource(loader._upsert_names)
+        assert "chunked(" in source, "name lookup must chunk its IN clause"
+        assert ".in_(list(" not in source, "unbounded IN clause reintroduced"

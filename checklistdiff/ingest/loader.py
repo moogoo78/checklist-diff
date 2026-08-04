@@ -30,6 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from checklistdiff.config import get_settings
+from checklistdiff.db import chunked
 from checklistdiff.ingest.rows import SourceRow
 from checklistdiff.models import (
     Checklist,
@@ -86,10 +87,12 @@ def file_sha256(path: Path) -> str:
 
 
 def _upsert_names(
-    session: Session, rows: Sequence[SourceRow], report: IngestReport
+    session: Session,
+    rows: Sequence[SourceRow],
+    report: IngestReport,
+    parser: NameParser,
 ) -> dict[str, Name]:
     """Parse all distinct name strings and return {verbatim -> Name}."""
-    parser = NameParser()
     verbatims = [r.full_name for r in rows if r.full_name]
     parsed = parser.parse_many(verbatims)
 
@@ -97,10 +100,13 @@ def _upsert_names(
     # so collapse by norm_key before touching the database.
     by_key = {p.norm_key: p for p in parsed.values() if p.parsed_ok}
 
+    # Chunked: a release can hold more distinct names than SQLite allows bind
+    # parameters in a single statement.
     existing = {
         n.norm_key: n
+        for chunk in chunked(by_key)
         for n in session.scalars(
-            select(Name).where(Name.norm_key.in_(list(by_key)))
+            select(Name).where(Name.norm_key.in_(chunk))
         ).all()
     }
     report.names_reused = len(existing)
@@ -143,6 +149,7 @@ def _resolve_links(
     usages: list[Usage],
     names: dict[str, Name],
     report: IngestReport,
+    parser: NameParser,
 ) -> None:
     """Second pass: fill in accepted_usage_id and parent_usage_id."""
     by_source_id: dict[str, Usage] = {}
@@ -161,13 +168,34 @@ def _resolve_links(
         ):
             by_canonical[name.canonical_key] = usage
 
+    # Links given as a name string have to be parsed before they can be matched,
+    # and `NameParser.parse` is one gnparser process per call. Resolving them as
+    # they come up costs a process per link, which is invisible on a small
+    # fixture and dominates the whole ingest on a real checklist — a few hundred
+    # thousand spawns. So collect them first and parse the distinct set in one
+    # batch, exactly as `_upsert_names` already does for the names themselves.
+    #
+    # Only links that an ID cannot already resolve are collected: `find` tries
+    # `by_source_id` first, and a source that supplies IDs never needs a parse.
+    pending: set[str] = set()
+    for row in rows:
+        for taxon_id, name_str in (
+            (row.accepted_taxon_id, row.accepted_scientific_name),
+            (row.parent_taxon_id, row.parent_scientific_name),
+        ):
+            if name_str and not (taxon_id and taxon_id in by_source_id):
+                pending.add(name_str.strip())
+
+    # The parser is shared with `_upsert_names`, so a link naming a taxon that
+    # is also a row in this file — the overwhelmingly common case — is already
+    # cached and costs no subprocess at all.
+    parsed_links = parser.parse_many(sorted(pending)) if pending else {}
+
     def find(taxon_id: str | None, name_str: str | None) -> Usage | None:
         if taxon_id and (hit := by_source_id.get(taxon_id)):
             return hit
-        if name_str:
-            parsed = NameParser().parse(name_str)
-            if parsed and (hit := by_canonical.get(parsed.canonical_key)):
-                return hit
+        if name_str and (parsed := parsed_links.get(name_str.strip())):
+            return by_canonical.get(parsed.canonical_key)
         return None
 
     for row, usage in zip(rows, usages, strict=True):
@@ -262,7 +290,8 @@ def ingest_release(
         session.flush()
         raise IngestError(f"no usable rows in source ({report.rows_read} read)")
 
-    names = _upsert_names(session, usable, report)
+    parser = NameParser()
+    names = _upsert_names(session, usable, report, parser)
 
     usages: list[Usage] = []
     batch = settings.ingest_batch_size
@@ -291,7 +320,7 @@ def ingest_release(
     # `usable` and `usages` must stay index-aligned for the link pass; drop any
     # rows whose name failed to parse.
     aligned = [r for r in usable if r.full_name in names]
-    _resolve_links(session, aligned, usages, names, report)
+    _resolve_links(session, aligned, usages, names, report, parser)
 
     report.usages_written = len(usages)
     release.usage_count = len(usages)

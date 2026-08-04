@@ -194,3 +194,81 @@ class TestIngest:
                 Usage.release_id == release_id, Usage.source_taxon_id == taxon_id
             )
         )
+
+
+class TestLinkResolutionBatching:
+    """Name-based links must not cost one gnparser process each.
+
+    `_run_gnparser` is a subprocess spawn. Resolving links one at a time is
+    correct but turns a minutes-long ingest into an hours-long one on a real
+    checklist, and nothing about the result changes — so only a count can catch
+    a regression here.
+    """
+
+    @staticmethod
+    def _count_spawns(monkeypatch) -> list[int]:
+        from checklistdiff.naming import parse as parse_mod
+
+        spawns: list[int] = []
+        original = parse_mod._run_gnparser
+
+        def counting(names):
+            names = list(names)
+            spawns.append(len(names))
+            return original(names)
+
+        monkeypatch.setattr(parse_mod, "_run_gnparser", counting)
+        return spawns
+
+    @staticmethod
+    def _rows(count: int) -> list[SourceRow]:
+        accepted = [
+            SourceRow(
+                source_taxon_id=None,
+                scientific_name=f"Testia alpha{i}",
+                authorship="Smith",
+                status_raw="accepted",
+            )
+            for i in range(count)
+        ]
+        # No taxon IDs anywhere, so every synonym link has to go through the
+        # parser rather than the source-ID index.
+        synonyms = [
+            SourceRow(
+                source_taxon_id=None,
+                scientific_name=f"Testia vetus{i}",
+                authorship="Jones",
+                status_raw="synonym",
+                accepted_scientific_name=f"Testia alpha{i} Smith",
+            )
+            for i in range(count)
+        ]
+        return accepted + synonyms
+
+    def test_spawn_count_does_not_grow_with_link_count(
+        self, session, checklist, monkeypatch
+    ) -> None:
+        spawns = self._count_spawns(monkeypatch)
+
+        ingest_release(
+            session,
+            checklist,
+            "batched",
+            self._rows(40),
+            source_format=SourceFormat.CSV.value,
+        )
+
+        # One batch covers every name in the file. The link pass adds nothing:
+        # it shares the parser, so the names it looks up are already cached.
+        assert len(spawns) == 1, f"expected 1 gnparser spawn, got {len(spawns)}"
+
+    def test_links_still_resolve_when_batched(self, session, checklist) -> None:
+        report = ingest_release(
+            session,
+            checklist,
+            "resolved",
+            self._rows(40),
+            source_format=SourceFormat.CSV.value,
+        )
+        assert report.accepted_resolved == 40
+        assert report.unresolved_accepted == []

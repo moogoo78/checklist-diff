@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import Iterable, Iterator, TypeVar
 
 from sqlalchemy import Engine, create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
@@ -18,6 +18,28 @@ from sqlalchemy.orm import Session, sessionmaker
 from checklistdiff.config import get_settings
 
 log = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+# Bind parameters per `IN` clause. SQLite caps the total per statement
+# (`SQLITE_MAX_VARIABLE_NUMBER`, commonly 32766 but 250000 on some builds), and
+# the height of that ceiling is what makes it dangerous: every checklist below
+# it works, and the first one above it fails at diff time with "too many SQL
+# variables". This is well under any build's limit.
+IN_CLAUSE_CHUNK = 5000
+
+
+def chunked(items: Iterable[T], size: int = IN_CLAUSE_CHUNK) -> Iterator[list[T]]:
+    """Yield `items` in batches small enough to pass to a SQL `IN` clause."""
+    batch: list[T] = []
+    for item in items:
+        batch.append(item)
+        if len(batch) == size:
+            yield batch
+            batch = []
+    if batch:
+        yield batch
+
 
 # Applied to every new connection. journal_mode is persisted in the file itself,
 # but setting it is idempotent and costs nothing.
