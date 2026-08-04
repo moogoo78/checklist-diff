@@ -9,7 +9,7 @@ import typer
 from sqlalchemy import select
 
 from checklistdiff.db import analyze, bulk_load, session_scope
-from checklistdiff.ingest import csvmap, dwca
+from checklistdiff.ingest import csvmap, dwca, taicol
 from checklistdiff.ingest.loader import IngestError, file_sha256, ingest_release
 from checklistdiff.models import Checklist, SourceFormat
 
@@ -31,10 +31,21 @@ def ingest(
     replace: bool = typer.Option(
         False, "--replace", help="Overwrite this version if already ingested."
     ),
+    reader: str = typer.Option(
+        "auto",
+        "--reader",
+        help="auto | dwca | csv | taicol-name. 'auto' treats .zip as a DwC-A, "
+        "anything else as CSV/XLSX.",
+    ),
 ) -> None:
     """Ingest a release from a Darwin Core Archive, CSV, or spreadsheet."""
-    is_dwca = file.suffix.lower() == ".zip"
-    if not is_dwca and map_file is None:
+    readers = {"auto", "dwca", "csv", "taicol-name"}
+    if reader not in readers:
+        raise typer.BadParameter(f"--reader must be one of {sorted(readers)}")
+    if reader == "auto":
+        reader = "dwca" if file.suffix.lower() == ".zip" else "csv"
+
+    if reader == "csv" and map_file is None:
         raise typer.BadParameter(
             "--map is required for CSV/XLSX input (a DwC-A carries its own meta.xml)"
         )
@@ -48,9 +59,12 @@ def ingest(
 
     digest = file_sha256(file)
 
-    if is_dwca:
+    if reader == "dwca":
         rows = dwca.read_rows(file)
         source_format = SourceFormat.DWCA.value
+    elif reader == "taicol-name":
+        rows = taicol.read_rows(file)
+        source_format = SourceFormat.CSV.value
     else:
         rows = csvmap.read_rows(file, map_file)  # type: ignore[arg-type]
         source_format = csvmap.detect_format(file)

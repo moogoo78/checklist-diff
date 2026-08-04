@@ -51,6 +51,29 @@ docker compose exec app ckdiff trace "Zanthoxylum ailanthoides"
 
 The web UI is at <http://localhost:8087>.
 
+### TaiCOL
+
+TaiCOL's *name* export gets a dedicated reader (`--reader taicol-name`), because
+three of its conventions cannot be expressed as a field map: a name placed in
+several taxa carries parallel comma-joined `usage_status` and `taxon_id` lists
+and has to become several usages; synonyms link to their accepted name only
+indirectly through a shared `taxon_id`; and `usage_status` is blank for names
+that are catalogued but unplaced.
+
+Drop the exports in `./checklists/` as `TaiCOL_name_YYYYMMDD.zip` and run:
+
+```bash
+./scripts/import_taicol.sh
+```
+
+It registers the checklist, ingests every export it finds — reading the version
+and release date from each filename — then runs `check-ids` and diffs the oldest
+against the newest. Re-run with `--replace` to reload releases already ingested.
+
+Prefer the *name* export over the *taxon* export: the latter packs synonyms into
+a comma-joined column with their authorship stripped, which both loses author
+strings and risks collapsing homonyms into a single `Name` row.
+
 ## Where the data lives
 
 `./data/checklistdiff.sqlite` — a bind mount, so it is an ordinary file you own.
