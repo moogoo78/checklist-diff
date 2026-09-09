@@ -168,8 +168,8 @@ def build_trace(session: Session, name: Name) -> Trace:
     trace.checklists = list(by_checklist.values())
 
     # Same canonical name, different Name row: a homonym, or an author variant.
-    # Surfacing these is the difference between "this name is not in TaiCOL" and
-    # "TaiCOL has it under a different author".
+    # Surfacing these is the difference between "this name is not in the
+    # checklist" and "the checklist has it under a different author".
     siblings = session.scalars(
         select(Name).where(
             Name.canonical_key == name.canonical_key, Name.id != name.id

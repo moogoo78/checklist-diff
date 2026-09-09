@@ -107,8 +107,8 @@ for (( i = 0; i < ${#versions[@]} - 1; i++ )); do
 
     echo
     echo "=== ID stability: $from -> $to ==="
-    # Run before the diff: it reports whether TaiCOL's name_ids actually survive
-    # between releases, which is what decides the anchoring strategy.
+    # Run before the diff: it reports what fraction of name_ids survive between
+    # releases, which is what decides the anchoring strategy.
     "${EXEC[@]}" ckdiff checklist check-ids --code "$CODE" --from "$from" --to "$to"
 
     echo

@@ -14,9 +14,9 @@ intact, computes a typed **change set** between consecutive releases, and traces
 one name across its whole recorded life.
 
 **Scope:** local, regional, and specialist checklists — the kind published as a
-Darwin Core Archive or a spreadsheet by a small team. Not GBIF Backbone or
-Catalogue of Life; GlobalNames already covers those, and matching against a global
-backbone is a different problem from tracking a checklist's own revision history.
+Darwin Core Archive or a spreadsheet by a small team. Tracking one checklist's own
+revision history is a different problem from matching names against a global
+backbone, and this tool is built for the former.
 
 ## Quick start
 
@@ -53,12 +53,12 @@ The web UI is at <http://localhost:8087>.
 
 ### TaiCOL
 
-TaiCOL's *name* export gets a dedicated reader (`--reader taicol-name`), because
-three of its conventions cannot be expressed as a field map: a name placed in
-several taxa carries parallel comma-joined `usage_status` and `taxon_id` lists
-and has to become several usages; synonyms link to their accepted name only
-indirectly through a shared `taxon_id`; and `usage_status` is blank for names
-that are catalogued but unplaced.
+The `taicol-name` reader exists because three conventions of this export format
+cannot be expressed as a field map: a name placed in several taxa carries
+parallel comma-joined `usage_status` and `taxon_id` lists and has to become
+several usages; synonyms link to their accepted name only indirectly through a
+shared `taxon_id`; and `usage_status` is blank for names that are catalogued but
+unplaced.
 
 Drop the exports in `./checklists/` as `TaiCOL_name_YYYYMMDD.zip` and run:
 
@@ -72,10 +72,6 @@ consecutive pair. Releases already loaded are skipped, so dropping in one more
 export and re-running only ingests that one. `--replace` reloads everything
 instead, which is what a change to how the reader assigns anchors calls for:
 releases must not be mixed across two anchoring rules.
-
-Prefer the *name* export over the *taxon* export: the latter packs synonyms into
-a comma-joined column with their authorship stripped, which both loses author
-strings and risks collapsing homonyms into a single `Name` row.
 
 ## Where the data lives
 
@@ -200,5 +196,5 @@ Requirements: Docker. Nothing is installed on the host.
 MIT — see [LICENSE](LICENSE).
 
 Note that this covers the *code* only. Checklist data is not bundled; each
-source keeps its own license, recorded per checklist in the database (TaiCOL's
-name export, for example, is CC BY 4.0).
+source keeps its own license, which is recorded per checklist in the database at
+ingest time.

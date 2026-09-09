@@ -45,7 +45,7 @@ ROWS: list[dict[str, str]] = [
      "rank": "Species", "usage_status": "accepted,misapplied",
      "taxon_id": "t006", **PLANT},
     # The same name_id and taxon_id repeated on two rows under two statuses,
-    # rather than joined into one row. TaiCOL really does this.
+    # rather than joined into one row.
     {"name_id": "7", "simple_name": "Testia gemina", "name_author": "Vert",
      "rank": "Species", "usage_status": "not-accepted", "taxon_id": "t002", **PLANT},
     {"name_id": "7", "simple_name": "Testia gemina", "name_author": "Vert",
