@@ -194,3 +194,11 @@ docker compose exec app alembic revision --autogenerate -m "message"
 ```
 
 Requirements: Docker. Nothing is installed on the host.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+Note that this covers the *code* only. Checklist data is not bundled; each
+source keeps its own license, recorded per checklist in the database (TaiCOL's
+name export, for example, is CC BY 4.0).

@@ -27,7 +27,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md LICENSE ./
 COPY checklistdiff ./checklistdiff
 # Build a wheel, then resolve it into a self-contained venv we can copy over.
 RUN python -m venv /venv \
